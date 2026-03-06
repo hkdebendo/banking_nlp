@@ -105,12 +105,6 @@ python -m build
 
 Les artefacts seront générés dans `dist/` (`.whl` et `.tar.gz`).
 
-## Publication PyPI (optionnel)
-```bash
-python -m pip install --upgrade twine
-twine upload dist/*
-```
-
 ## Notes
 - Python recommandé: 3.10+
 - Le package embarque les modèles spaCy entraînés.
