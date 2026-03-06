@@ -1,0 +1,10 @@
+{
+  "labels":[
+    "jour",
+    "semaine",
+    "mois",
+    "annee"
+  ],
+  "threshold":0.0,
+  "positive_label":null
+}

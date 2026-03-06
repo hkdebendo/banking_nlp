@@ -1,0 +1,14 @@
+{
+  "labels":[
+    "ANNULATION",
+    "CONSULTER_SOLDE",
+    "HISTORIQUE_FILTRE",
+    "HISTORIQUE_SIMPLE",
+    "INCOMPRIS",
+    "VIREMENT_INIT",
+    "aide",
+    "salutation"
+  ],
+  "threshold":0.0,
+  "positive_label":null
+}

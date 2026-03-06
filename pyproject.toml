@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "banking_nlp"
+version = "1.0.0"
+description = "French banking intent and entities extraction package"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "Ricardo AMOUSSOU", email = "dgamoussouricardo@gmail.com" }
+]
+dependencies = [
+  "spacy>=3.7,<4.0"
+]
+keywords = ["nlp", "spacy", "intent-classification", "entity-extraction", "banking"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Homepage = "https://github.com/hkdebendo/banking_nlp"
+Repository = "https://github.com/hkdebendo/banking_nlp"
+Issues = "https://github.com/hkdebendo/banking_nlp/issues"
+
+[project.scripts]
+banking-nlp-welcome = "banking_nlp.cli:welcome_command"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["banking_nlp*"]
+
+[tool.setuptools.package-data]
+banking_nlp = [
+  "models/**",
+  "py.typed"
+]
