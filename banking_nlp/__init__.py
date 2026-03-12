@@ -1,7 +1,7 @@
 from .predictor import predict, warmup
 
 __all__ = ["predict", "warmup"]
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 
 
 def _welcome() -> None:

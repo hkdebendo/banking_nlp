@@ -1,2 +1,3 @@
 recursive-include banking_nlp/models *
+recursive-include banking_nlp/resources *
 include README.md
