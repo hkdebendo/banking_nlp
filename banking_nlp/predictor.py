@@ -56,6 +56,94 @@ TRAILING_BENEFICIARY_TOKENS = {
     "silvousplait",
 }
 
+INVALID_BENEFICIARY_TOKENS = {
+    "franc",
+    "francs",
+    "fcfa",
+    "xof",
+    "cfa",
+    "euro",
+    "euros",
+    "mille",
+    "milles",
+    "million",
+    "millions",
+}
+
+INVALID_BENEFICIARY_ACTION_TOKENS = {
+    "argent",
+    "crediter",
+    "envoie",
+    "envoyer",
+    "envoyez",
+    "effectuer",
+    "faire",
+    "lancer",
+    "transferer",
+    "transfert",
+    "virer",
+    "virement",
+}
+
+OUT_OF_SCOPE_SIGNALS = {
+    "aeroport",
+    "anglais",
+    "basket",
+    "bluetooth",
+    "burger",
+    "canada",
+    "casque",
+    "chocolat",
+    "chauddehors",
+    "centreville",
+    "dissertation",
+    "devoir",
+    "dakar",
+    "dormir",
+    "exercice",
+    "exercices",
+    "fievre",
+    "film",
+    "films",
+    "garde",
+    "gmail",
+    "googlemaps",
+    "grippe",
+    "hotel",
+    "imprimante",
+    "intelligenceartificielle",
+    "itineraire",
+    "lasagne",
+    "lasagnes",
+    "maps",
+    "maths",
+    "meteo",
+    "musique",
+    "netflix",
+    "pizza",
+    "pleuvoir",
+    "psg",
+    "pythagore",
+    "premierleague",
+    "pc",
+    "recette",
+    "regime",
+    "restaurant",
+    "realmadrid",
+    "revolution",
+    "rome",
+    "serie",
+    "score",
+    "stationservice",
+    "tete",
+    "temps",
+    "telephone",
+    "virus",
+    "visa",
+    "windows",
+    "yopougon",
+}
+
 MONTH_TOKENS = {
     "janvier",
     "fevrier",
@@ -110,7 +198,7 @@ def normalize_for_intent(text: str) -> str:
         "qu est": "quest",
     }
     for src, dst in replacements.items():
-        text = text.replace(src, dst)
+        text = re.sub(rf"\b{re.escape(src)}\b", dst, text)
     return text
 
 
@@ -129,6 +217,18 @@ def normalize_beneficiary_token(token: str) -> str:
     return token
 
 
+def normalize_beneficiary_text(text: str) -> str:
+    text = text or ""
+    text = text.replace("œ", "oe").replace("Œ", "OE").replace("æ", "ae").replace("Æ", "AE")
+    text = text.replace("Å“", "oe").replace("Å’", "OE").replace("Ã¦", "ae").replace("Ã†", "AE")
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.lower().replace("â€™", "'").replace("Ã¢â‚¬â„¢", "'")
+    text = re.sub(r"[^a-z0-9' -]+", " ", text)
+    text = re.sub(r"\s*-\s*", "-", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _load_spacy(path: Path):
     if not path.exists():
         return None
@@ -139,7 +239,7 @@ def clean_beneficiary_candidate(value: str | None) -> str | None:
     if not value:
         return None
 
-    candidate = normalize(value)
+    candidate = normalize_beneficiary_text(value)
     candidate = re.sub(
         r"\b(?:ce soir|maintenant|rapidement|svp|stp|merci|s'il te plait|s'il vous plait|silteplait|silvousplait)\b",
         " ",
@@ -157,17 +257,33 @@ def clean_beneficiary_candidate(value: str | None) -> str | None:
             tokens = tokens[1:]
         while tokens and normalize_beneficiary_token(tokens[-1]) in TRAILING_BENEFICIARY_TOKENS:
             tokens = tokens[:-1]
+        while tokens and normalize_beneficiary_token(tokens[-1]) in INVALID_BENEFICIARY_TOKENS:
+            tokens = tokens[:-1]
 
         candidate = " ".join(tokens).strip(" '")
         changed = candidate != previous
 
+    if any(token in INVALID_BENEFICIARY_ACTION_TOKENS for token in candidate.split()):
+        return None
+    if normalize_beneficiary_token(candidate) in INVALID_BENEFICIARY_TOKENS:
+        return None
     return candidate or None
+
+
+def resolve_known_beneficiaire(value: str | None, known_beneficiaires: set[str]) -> str | None:
+    if not value:
+        return None
+    value_flat = compact(value)
+    for name in sorted(known_beneficiaires, key=len, reverse=True):
+        if compact(name) == value_flat:
+            return name
+    return value
 
 
 def load_known_beneficiaires() -> set[str]:
     if not KNOWN_BENEFICIAIRES_PATH.exists():
         return set()
-    with KNOWN_BENEFICIAIRES_PATH.open("r", encoding="utf-8") as f:
+    with KNOWN_BENEFICIAIRES_PATH.open("r", encoding="utf-8-sig") as f:
         values = json.load(f)
     return {canonicalize_beneficiaire(value) for value in values if canonicalize_beneficiaire(value)}
 
@@ -204,9 +320,36 @@ def load_slot_model(name: str):
 
 def has_time_reference(text_norm: str) -> bool:
     flat = compact(text_norm)
-    if any(token in flat for token in DAY_TOKENS | MONTH_TOKENS):
+    tokens = set(text_norm.split())
+    if any(token in tokens for token in DAY_TOKENS | MONTH_TOKENS):
         return True
-    if any(token in flat for token in ["hier", "aujourdhui", "demain", "semaine", "mois", "annee", "anpasse", "debutdelasemaine", "debutdumois"]):
+    if any(token in tokens for token in [
+        "hier",
+        "aujourdhui",
+        "demain",
+        "jour",
+        "matin",
+        "soir",
+        "semaine",
+        "mois",
+        "annee",
+        "l'annee",
+        "an",
+    ]):
+        return True
+    if any(token in flat for token in [
+        "dujour",
+        "cematin",
+        "cesoir",
+        "weekend",
+        "weekenddernier",
+        "semainepassee",
+        "moispasse",
+        "anpasse",
+        "anneepassee",
+        "debutdelasemaine",
+        "debutdumois",
+    ]):
         return True
     if re.search(r"\b20\d{2}\b", text_norm):
         return True
@@ -219,6 +362,20 @@ def has_greeting_signal(text_norm: str) -> bool:
     return (
         any(stem in flat for stem in ["bonjour", "bonsoir", "salut", "hello", "coucou", "wesh", "bjr", "bsr", "slt", "allo"])
         or any(token in tokens for token in ["hey", "yo", "cc"])
+    )
+
+
+def has_social_greeting_signal(text_norm: str) -> bool:
+    flat = compact(text_norm)
+    return has_greeting_signal(text_norm) and any(
+        stem in flat
+        for stem in [
+            "cava",
+            "caroule",
+            "commenttuvas",
+            "commentcava",
+            "bienoubien",
+        ]
     )
 
 
@@ -236,6 +393,85 @@ def has_help_signal(text_norm: str) -> bool:
     return False
 
 
+def has_guidance_signal(text_norm: str) -> bool:
+    flat = compact(text_norm)
+    tokens = set(text_norm.split())
+    return (
+        has_help_signal(text_norm)
+        or any(token in tokens for token in ["comment", "aide", "assistance", "guide", "support"])
+        or any(stem in flat for stem in [
+            "aider",
+            "aidemoi",
+            "besoindaide",
+            "besoindassistance",
+            "bloque",
+            "commandedisponible",
+            "commandesdisponibles",
+            "commentcamarche",
+            "commentjefais",
+            "coupdemain",
+            "expliquemoi",
+            "galere",
+            "guidemoi",
+            "perdu",
+        ])
+    )
+
+
+def has_explicit_out_of_scope_frame(text_norm: str) -> bool:
+    flat = compact(text_norm)
+    return any(
+        stem in flat
+        for stem in [
+            "rienavoiraveclabanque",
+            "horssujetbancaire",
+            "cenestpasunedemandebancaire",
+            "jeneparlepasdebanque",
+        ]
+    )
+
+
+def has_out_of_scope_signal(text_norm: str) -> bool:
+    flat = compact(text_norm)
+    return (
+        has_explicit_out_of_scope_frame(text_norm)
+        or "programmetele" in flat
+        or any(signal in flat for signal in OUT_OF_SCOPE_SIGNALS)
+    )
+
+
+def has_banking_domain_signal(text_norm: str) -> bool:
+    flat = compact(text_norm)
+    return any(
+        stem in flat
+        for stem in [
+            "banque",
+            "bancaire",
+            "compte",
+            "solde",
+            "epargne",
+            "livret",
+            "courant",
+            "virement",
+            "transfert",
+            "transaction",
+            "operation",
+            "historique",
+            "releve",
+            "paiement",
+            "debit",
+            "credit",
+            "argent",
+            "franc",
+            "fcfa",
+            "xof",
+            "beneficiaire",
+            "application",
+            "service",
+        ]
+    )
+
+
 def has_transfer_action_signal(text_norm: str) -> bool:
     if re.search(r"\bepargne\s+\d", text_norm):
         return True
@@ -250,8 +486,8 @@ def has_transfer_action_signal(text_norm: str) -> bool:
             r"\b(?:mettre|mets|mettez)\b",
             r"\b(?:alimenter|alimente|alimentez)\b",
             r"\b(?:economiser|economise|epargner|securiser|securise)\b",
-            r"\b(?:faire|lancer|effectuer|passer)\s+un\s+virement\b",
-            r"\b(?:faire|lancer|effectuer|passer)\s+un\s+transfert\b",
+            r"\b(?:faire|fais|lancer|effectuer|passer)\s+un\s+virement\b",
+            r"\b(?:faire|fais|lancer|effectuer|passer)\s+un\s+transfert\b",
         ]
     )
 
@@ -275,7 +511,7 @@ def has_balance_signal(text_norm: str) -> bool:
             "argenttotal",
         ]
     )
-    has_query = any(stem in flat for stem in ["combien", "reste", "ouenest", "quelest", "cestquoi", "montremoi", "affiche", "donnemoi", "voir"])
+    has_query = any(stem in flat for stem in ["combien", "reste", "ouenest", "quelest", "cestquoi", "montremoi", "affiche", "donnemoi", "voir", "consulter"])
     return has_account_target and has_query
 
 
@@ -296,12 +532,22 @@ def has_history_subject_signal(text_norm: str) -> bool:
             "activites",
             "depense",
             "depenses",
+            "achat",
+            "achats",
             "paiement",
             "paiements",
             "credit",
             "credits",
             "rentree",
             "rentrees",
+            "salaire",
+            "salaires",
+            "remboursement",
+            "remboursements",
+            "versement",
+            "versements",
+            "retrait",
+            "retraits",
             "sortiedargent",
             "sortiesdargent",
         ]
@@ -380,11 +626,13 @@ def parse_beneficiaire(text_norm: str, known_beneficiaires: set[str]) -> str | N
         candidate = clean_beneficiary_candidate(m.group("candidate"))
         candidate = canonicalize_beneficiaire(candidate)
         if candidate and candidate not in {"compte", "compte courant", "compte cheque"}:
-            return candidate
+            return resolve_known_beneficiaire(candidate, known_beneficiaires)
 
     m = re.search(r"\b(?:envoy[a-z]*|transf[a-z]*|virer|virement|credit[a-z]*)\s+\d+\s+([a-z][a-z\-]{1,30})\b", text_norm)
     if m:
-        return canonicalize_beneficiaire(clean_beneficiary_candidate(m.group(1).strip()))
+        candidate = canonicalize_beneficiaire(clean_beneficiary_candidate(m.group(1).strip()))
+        if candidate and normalize_beneficiary_token(candidate) not in INVALID_BENEFICIARY_TOKENS:
+            return candidate
 
     return None
 
@@ -396,7 +644,7 @@ def canonicalize_beneficiaire(value: str | None) -> str | None:
     if not value:
         return None
     flat = compact(value)
-    if any(stem in flat for stem in ["epargne", "epagne", "epane", "epagn", "economi", "conomi", "livret", "cagnotte", "basdelaine"]):
+    if any(stem in flat for stem in ["epargne", "epagne", "epane", "epagn", "economi", "conomi", "livret", "cagnotte", "basdelaine", "mettredecote", "decote"]):
         return "epargne"
     return value
 
@@ -423,7 +671,7 @@ def extract_virement_entities(text: str, known_beneficiaires: set[str]) -> dict[
         beneficiaire = parse_beneficiaire(text_norm, known_beneficiaires)
 
     return {
-        "beneficiaire": canonicalize_beneficiaire(beneficiaire),
+        "beneficiaire": resolve_known_beneficiaire(canonicalize_beneficiaire(beneficiaire), known_beneficiaires),
         "montant": montant or None,
     }
 
@@ -445,7 +693,22 @@ def extract_historique_filtre_entities(text: str) -> dict[str, Any]:
     return {"type": type_value, "time": time_value}
 
 
+def infer_compte_rule(text: str) -> str | None:
+    flat = compact(normalize(text))
+    if any(stem in flat for stem in ["epargne", "epagne", "epagn", "econom", "livret", "cagnotte", "basdelaine", "mettredecote"]):
+        return "epargne"
+    if any(stem in flat for stem in ["courant", "cheque", "principal", "quotidien", "touslesjours", "depense", "depenses", "paiement"]):
+        return "courant"
+    if "compte" in flat:
+        return "all"
+    return None
+
+
 def extract_consulter_solde_entities(text: str) -> dict[str, Any]:
+    rule_compte = infer_compte_rule(text)
+    if rule_compte is not None:
+        return {"compte": rule_compte}
+
     model = load_slot_model("compte_textcat_fr")
     if model is not None:
         d = model(text)
@@ -464,7 +727,11 @@ def extract_consulter_solde_entities(text: str) -> dict[str, Any]:
 def apply_intent_overrides(text_norm: str, predicted: str) -> str:
     flat = compact(text_norm)
     has_greeting = has_greeting_signal(text_norm)
+    has_social_greeting = has_social_greeting_signal(text_norm)
     has_help = has_help_signal(text_norm)
+    has_guidance = has_guidance_signal(text_norm)
+    has_out_of_scope = has_out_of_scope_signal(text_norm)
+    has_banking_domain = has_banking_domain_signal(text_norm)
     has_cancel = any(
         stem in flat
         for stem in [
@@ -490,12 +757,17 @@ def apply_intent_overrides(text_norm: str, predicted: str) -> str:
     )
     has_hist_simple = has_hist_subject or has_hist_recent
 
+    if has_explicit_out_of_scope_frame(text_norm):
+        return "INCOMPRIS"
+    if has_out_of_scope and not (has_virement_action or has_balance or has_hist_subject or has_banking_domain):
+        return "INCOMPRIS"
+
+    if has_social_greeting and not (has_banking_domain or has_out_of_scope):
+        return "salutation"
+    if has_guidance and has_banking_domain and not has_out_of_scope:
+        return "aide"
     if has_cancel:
         return "ANNULATION"
-    if has_help and not has_virement_action and not has_hist_simple and not has_balance:
-        return "aide"
-    if has_greeting and not has_virement_action and not has_hist_simple and not has_balance:
-        return "salutation"
     if has_hist_filter:
         return "HISTORIQUE_FILTRE"
     if has_balance and not has_hist_subject and not has_virement_action:
@@ -504,9 +776,9 @@ def apply_intent_overrides(text_norm: str, predicted: str) -> str:
         return "HISTORIQUE_SIMPLE"
     if has_virement_action:
         return "VIREMENT_INIT"
-    if has_help:
+    if (has_help or has_guidance) and not has_out_of_scope:
         return "aide"
-    if has_greeting:
+    if has_greeting and not has_out_of_scope:
         return "salutation"
     return predicted
 
@@ -516,14 +788,12 @@ def has_strong_rule_signal(text_norm: str, intent: str) -> bool:
     if intent == "ANNULATION":
         return any(stem in flat for stem in ["annule", "annuler", "annulation", "stop", "laissetomber", "oublie", "arrete", "nenvoie"])
     if intent == "salutation":
-        return has_greeting_signal(text_norm)
+        return has_greeting_signal(text_norm) and not has_out_of_scope_signal(text_norm)
     if intent == "aide":
-        return has_help_signal(text_norm)
+        return (has_help_signal(text_norm) or has_guidance_signal(text_norm)) and not has_out_of_scope_signal(text_norm)
     if intent == "VIREMENT_INIT":
         has_action = has_transfer_action_signal(text_norm)
-        has_amount = parse_amount(text_norm) is not None
-        has_target_marker = parse_beneficiaire(text_norm, set()) is not None
-        return has_action and (has_amount or has_target_marker)
+        return has_action
     if intent == "HISTORIQUE_FILTRE":
         return has_history_subject_signal(text_norm) and has_time_reference(text_norm)
     if intent == "HISTORIQUE_SIMPLE":

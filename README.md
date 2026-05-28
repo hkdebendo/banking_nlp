@@ -1,6 +1,6 @@
-# banking_nlp 2.0.0
+# banking_nlp 2.1.0
 
-![Version](https://img.shields.io/badge/version-2.0.0-2563eb?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-2.1.0-2563eb?style=for-the-badge)
 ![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![spaCy](https://img.shields.io/badge/spaCy-3.7%2B-09A3D5?style=for-the-badge)
 ![French NLP](https://img.shields.io/badge/French-NLU-059669?style=for-the-badge)
@@ -14,9 +14,9 @@
 - le score du modèle
 - l’indicateur de fallback
 
-La version `2.0.0` embarque le **modèle actuellement entraîné** et le **moteur d’inférence aligné sur `infer_intent_entities.py`** du projet principal.
+La version `2.1.0` embarque le **modèle actuellement entraîné** et le **moteur d’inférence aligné sur `infer_intent_entities.py`** du projet principal.
 
-## Nouveautés de la v2.0.0
+## Nouveautés de la v2.1.0
 
 ![Inference](https://img.shields.io/badge/inference-synced_with_root-success?style=flat-square)
 ![Entities](https://img.shields.io/badge/entities-more_robust-success?style=flat-square)
@@ -32,6 +32,23 @@ La version `2.0.0` embarque le **modèle actuellement entraîné** et le **moteu
 - Overrides d’intentions plus solides pour `solde`, `historique`, `aide`, `salutation`, `annulation` et `virement`
 
 ## Installation
+
+### Derniere version publiee
+
+```bash
+pip install banking-nlp
+```
+
+Cette commande installe automatiquement la version la plus recente disponible sur PyPI. Apres publication de `2.1.0`, elle installera donc `banking-nlp==2.1.0`.
+
+### Version precise
+
+```bash
+pip install banking-nlp==2.1.0
+pip install banking-nlp==2.0.0
+```
+
+Utilisez cette forme quand vous voulez reproduire exactement le comportement d'une version donnee.
 
 ### Depuis le dossier local
 
@@ -102,7 +119,7 @@ print(banking_nlp.predict("Comment puis-je utiliser le service ?"))
 - `HISTORIQUE_FILTRE` → `type`, `time`
 - `CONSULTER_SOLDE` → `compte`
 
-## Ce que la v2.0.0 gère mieux
+## Ce que la v2.1.0 gère mieux
 
 ### Virements
 
@@ -154,7 +171,7 @@ python -m pip install --upgrade build
 python -m build
 ```
 
-Les nouveaux artefacts de `2.0.0` sont générés dans `dist/` sans supprimer les anciens fichiers déjà présents.
+Les nouveaux artefacts de `2.1.0` sont générés dans `dist/` sans supprimer les anciens fichiers déjà présents.
 
 ## Commande CLI
 

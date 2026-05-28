@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "banking_nlp"
-version = "2.0.0"
+version = "2.1.0"
 description = "French banking intent and entities extraction package"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,6 +13,7 @@ authors = [
   { name = "Ricardo AMOUSSOU", email = "dgamoussouricardo@gmail.com" }
 ]
 dependencies = [
+  "click>=8.1",
   "spacy>=3.7,<4.0"
 ]
 keywords = ["nlp", "spacy", "intent-classification", "entity-extraction", "banking"]
